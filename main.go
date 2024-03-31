@@ -79,7 +79,6 @@ func main() {
 				expl, err := getExplanation(input)
 				if err != nil {
 					displayText = []string{err.Error()}
-					resource = ""
 				} else {
 					displayText = expl
 					resource = input
@@ -239,7 +238,6 @@ func drawText(screen tcell.Screen, x, y, width, height int, style tcell.Style, t
 
 func getExplanation(resource string) ([]string, error) {
 	cmd := exec.Command("kubectl", "explain", resource)
-	// cmd := exec.Command("cat", "lines.txt")
 
 	out, err := cmd.Output()
 	if err != nil {
