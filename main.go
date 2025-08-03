@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"container/list"
 	"errors"
 	"os/exec"
 	"strings"
@@ -40,6 +41,8 @@ func main() {
 		SetFieldBackgroundColor(tcell.ColorBlack).
 		SetFieldTextColor(tcell.ColorWhite)
 
+	scroller := newScroller()
+
 	searchExplainOutputInput.SetDoneFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyEnter:
@@ -51,7 +54,11 @@ func main() {
 
 			lines := strings.Split(view.GetText(true), "\n")
 			var highlighted strings.Builder
-			for _, line := range lines {
+
+			scroller.reset()
+
+			for i, line := range lines {
+				found := false
 				for {
 					idx := strings.Index(line, searchTerm)
 					if idx == -1 {
@@ -65,17 +72,24 @@ func main() {
 					highlighted.WriteString("[white:black]")
 
 					line = line[idx+len(searchTerm):]
+					found = true
 				}
 
 				highlighted.WriteString("\n")
+
+				if found {
+					scroller.addLine(i)
+				}
 			}
 
 			view.SetText(highlighted.String())
-			app.SetFocus(view)
-
-		case tcell.KeyEscape:
-			app.SetFocus(view)
+			lnum := scroller.nextLine()
+			if lnum != -1 {
+				view.ScrollTo(lnum, 0)
+			}
 		}
+
+		app.SetFocus(view)
 	})
 
 	inputPages := tview.NewPages().
@@ -90,6 +104,16 @@ func main() {
 		switch ev.Key() {
 		case tcell.KeyRune:
 			switch ev.Rune() {
+			case 'n':
+				lnum := scroller.nextLine()
+				if lnum != -1 {
+					view.ScrollTo(lnum, 0)
+				}
+			case 'p':
+				lnum := scroller.prevLine()
+				if lnum != -1 {
+					view.ScrollTo(lnum, 0)
+				}
 			case ':': // Focus input field to type <type>.<fieldName>[.<fieldName>]
 				inputPages.SwitchToPage("explain")
 				explainInput.SetLabel(":")
@@ -131,4 +155,56 @@ func runExplain(path string) string {
 	}
 
 	return out.String()
+}
+
+type scroller struct {
+	l    *list.List
+	curr *list.Element
+}
+
+func newScroller() *scroller {
+	return &scroller{
+		l: list.New(),
+	}
+}
+
+func (s *scroller) addLine(lineNum int) {
+	s.l.PushBack(lineNum)
+}
+
+func (s *scroller) prevLine() int {
+	var el *list.Element
+	if s.curr == nil {
+		el = s.l.Back()
+	} else {
+		el = s.curr.Prev()
+	}
+
+	s.curr = el
+	if el == nil {
+		return -1
+	}
+
+	return el.Value.(int)
+}
+
+func (s *scroller) nextLine() int {
+	var el *list.Element
+	if s.curr == nil {
+		el = s.l.Front()
+	} else {
+		el = s.curr.Next()
+	}
+
+	s.curr = el
+	if el == nil {
+		return -1
+	}
+
+	return el.Value.(int)
+}
+
+func (s *scroller) reset() {
+	s.l.Init()
+	s.curr = nil
 }
