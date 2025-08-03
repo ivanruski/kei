@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os/exec"
 	"strings"
 
@@ -9,14 +10,20 @@ import (
 	"github.com/rivo/tview"
 )
 
-// runExplain runs `kubectl explain <path>` and returns its output.
 func runExplain(path string) string {
 	cmd := exec.Command("kubectl", "explain", path)
 	var out bytes.Buffer
 	cmd.Stdout = &out
+	cmd.Stderr = &out
 	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return out.String()
+		}
+
 		return err.Error()
 	}
+
 	return out.String()
 }
 
